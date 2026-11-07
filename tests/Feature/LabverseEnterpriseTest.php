@@ -151,6 +151,49 @@ class LabverseEnterpriseTest extends TestCase
         $repShow = $this->actingAs($receptionist, 'sanctum')->getJson("/api/reports/{$orderFresh->report->id}");
         $repShow->assertStatus(200)
             ->assertJsonPath('report.status', 'released');
+
+        // 8. Verify manual SMS & Email notification dispatch for the released report
+        $notifyRes = $this->actingAs($receptionist, 'sanctum')->postJson("/api/reports/{$orderFresh->report->id}/notify", [
+            'channels' => ['sms', 'email'],
+            'phone' => '+233 244 909 808',
+            'email' => 'kojo.antwi@example.com',
+        ]);
+        $notifyRes->assertStatus(200);
+    }
+
+    public function test_smtp_and_sms_communication_outbox_and_installer_wizard(): void
+    {
+        $admin = User::where('email', 'admin@labverse.com')->firstOrFail();
+
+        // 1. Test Email dispatch endpoint
+        $emailTest = $this->actingAs($admin, 'sanctum')->postJson('/api/communications/test-email', [
+            'recipient_email' => 'director@labverse.com',
+        ]);
+        $emailTest->assertStatus(200)
+            ->assertJsonPath('log.channel', 'email');
+
+        // 2. Test SMS dispatch endpoint
+        $smsTest = $this->actingAs($admin, 'sanctum')->postJson('/api/communications/test-sms', [
+            'recipient_phone' => '0244100001',
+        ]);
+        $smsTest->assertStatus(200)
+            ->assertJsonPath('log.channel', 'sms')
+            ->assertJsonPath('log.recipient', '+233244100001');
+
+        // 3. Inspect Communication Outbox logs
+        $logsRes = $this->actingAs($admin, 'sanctum')->getJson('/api/communications/logs');
+        $logsRes->assertStatus(200)
+            ->assertJsonStructure(['logs' => ['data'], 'summary' => ['total', 'sms_count', 'email_count']]);
+
+        // 4. Verify Guided Web Installer Wizard (/install) loads and checks database
+        $installPage = $this->get('/install');
+        $installPage->assertStatus(200);
+
+        $dbCheck = $this->postJson('/install/check-database', [
+            'db_connection' => 'sqlite',
+        ]);
+        $dbCheck->assertStatus(200)
+            ->assertJsonPath('connected', true);
     }
 }
 

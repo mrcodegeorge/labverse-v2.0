@@ -984,108 +984,611 @@ window.LabverseAdminOps = (function () {
     }
 
     // =========================================================================
-    // SYSTEM SETTINGS & AUDIT LOGS MODULE
+    // SYSTEM SETTINGS, SMTP EMAIL, SMS GATEWAY & AUDIT LOGS MODULE
     // =========================================================================
-    async function renderSettings() {
+    async function renderSettings(activeTab = 'facility') {
+        state.settingsTab = activeTab || state.settingsTab || 'facility';
         const container = document.getElementById('lv-workspace-content');
         if (!container) return;
 
         container.innerHTML = UI.pageHeader({
-            breadcrumb: 'Settings & Audit Logs',
-            title: 'Facility Settings, Clinical Policies & Security Audit Log',
-            description: 'Configure laboratory accreditation headers, critical value clinical policies, and inspect immutable system audit trails.',
-        }) + `<div id="lv-settings-body">${UI.loadingSpinner('Loading facility configuration and security audit logs...')}</div>`;
+            breadcrumb: 'Settings, SMTP/SMS & Audit Logs',
+            title: 'Facility Configuration, SMTP Email, SMS Gateways & Audit Trail',
+            description: 'Configure laboratory branding, SMTP email server, SMS notification gateways (Arkesel, Hubtel, mNotify, Twilio, Termii), automated clinical alerts, and inspect delivery & security logs.',
+            actionsHtml: `
+                <a href="/install" target="_blank" class="btn btn-light-surface btn-sm">
+                    <i data-lucide="wrench" style="width:15px;height:15px;"></i> Server Setup & Health Wizard
+                </a>
+            `,
+        }) + `
+            <div class="d-flex flex-wrap gap-2 mb-3 border-bottom pb-2">
+                <button type="button" class="btn btn-sm ${state.settingsTab === 'facility' ? 'btn-primary' : 'btn-light-surface'}" onclick="LabverseAdminOps.renderSettings('facility')">
+                    <i data-lucide="building-2" style="width:14px;height:14px;"></i> Facility & Clinical Policies
+                </button>
+                <button type="button" class="btn btn-sm ${state.settingsTab === 'smtp' ? 'btn-primary' : 'btn-light-surface'}" onclick="LabverseAdminOps.renderSettings('smtp')">
+                    <i data-lucide="mail" style="width:14px;height:14px;"></i> SMTP Email Integration
+                </button>
+                <button type="button" class="btn btn-sm ${state.settingsTab === 'sms' ? 'btn-primary' : 'btn-light-surface'}" onclick="LabverseAdminOps.renderSettings('sms')">
+                    <i data-lucide="message-square" style="width:14px;height:14px;"></i> SMS Gateway Integration
+                </button>
+                <button type="button" class="btn btn-sm ${state.settingsTab === 'triggers' ? 'btn-primary' : 'btn-light-surface'}" onclick="LabverseAdminOps.renderSettings('triggers')">
+                    <i data-lucide="bell-ring" style="width:14px;height:14px;"></i> Automated Triggers & Templates
+                </button>
+                <button type="button" class="btn btn-sm ${state.settingsTab === 'outbox' ? 'btn-primary' : 'btn-light-surface'}" onclick="LabverseAdminOps.renderSettings('outbox')">
+                    <i data-lucide="send" style="width:14px;height:14px;"></i> Communication Outbox (SMS & Email Logs)
+                </button>
+                <button type="button" class="btn btn-sm ${state.settingsTab === 'audit' ? 'btn-primary' : 'btn-light-surface'}" onclick="LabverseAdminOps.renderSettings('audit')">
+                    <i data-lucide="shield-alert" style="width:14px;height:14px;"></i> Security Audit Trail
+                </button>
+            </div>
+            <div id="lv-settings-body">${UI.loadingSpinner('Loading configuration...')}</div>
+        `;
         UI.refreshIcons();
 
         try {
-            const [setRes, auditRes] = await Promise.all([
-                UI.api('/settings'),
-                UI.api('/audit-logs'),
-            ]);
+            if (state.settingsTab === 'outbox') {
+                await renderCommunicationOutboxTab();
+                return;
+            }
+            if (state.settingsTab === 'audit') {
+                await renderAuditLogsTab();
+                return;
+            }
+
+            const setRes = await UI.api('/settings');
             const s = setRes.settings || {};
-            const logs = auditRes.data || [];
+            state.cachedSettings = s;
             const canEdit = window.LabverseApp.hasPermission('manage_settings');
+            const isTrue = (v) => ['1', 'true', 'yes', 'on', true].includes(String(v).toLowerCase());
 
             const wrap = document.getElementById('lv-settings-body');
             if (!wrap) return;
 
-            wrap.innerHTML = `
-                <div class="row g-4">
-                    <div class="col-12 col-lg-5">
-                        <form class="lv-card" onsubmit="event.preventDefault(); LabverseAdminOps.saveSystemSettings(this);">
-                            <div class="lv-card-header">
-                                <h2 class="lv-card-title"><i data-lucide="sliders" style="width:17px;height:17px;color:var(--lv-primary);"></i> Facility & Report Header Configuration</h2>
-                            </div>
-                            <div class="lv-card-body">
-                                <div class="mb-3">
+            if (state.settingsTab === 'facility') {
+                wrap.innerHTML = `
+                    <form class="lv-card" onsubmit="event.preventDefault(); LabverseAdminOps.saveSystemSettings(this);">
+                        <div class="lv-card-header">
+                            <h2 class="lv-card-title"><i data-lucide="sliders" style="width:17px;height:17px;color:var(--lv-primary);"></i> Facility Branding & Clinical Policy Configuration</h2>
+                        </div>
+                        <div class="lv-card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
                                     <label for="set-fac-name" class="form-label">Official Laboratory Name</label>
                                     <input type="text" id="set-fac-name" name="facility_name" class="form-control" value="${UI.esc(s.facility_name || '')}" ${canEdit ? '' : 'disabled'}>
                                 </div>
-                                <div class="mb-3">
+                                <div class="col-md-6">
                                     <label for="set-fac-acc" class="form-label">Accreditation & HeFRA Registration</label>
                                     <input type="text" id="set-fac-acc" name="facility_accreditation" class="form-control" value="${UI.esc(s.facility_accreditation || '')}" ${canEdit ? '' : 'disabled'}>
                                 </div>
-                                <div class="mb-3">
-                                    <label for="set-fac-phone" class="form-label">Primary Clinical Desk Phone</label>
-                                    <input type="text" id="set-fac-phone" name="facility_phone" class="form-control" value="${UI.esc(s.facility_phone || '')}" ${canEdit ? '' : 'disabled'}>
+                                <div class="col-md-6">
+                                    <label for="set-fac-phone" class="form-label">Primary Clinical Desk Phone (Used for Critical Escalation Alerts)</label>
+                                    <input type="text" id="set-fac-phone" name="facility_phone" class="form-control font-mono" value="${UI.esc(s.facility_phone || '')}" ${canEdit ? '' : 'disabled'}>
                                 </div>
-                                <div class="mb-3">
+                                <div class="col-md-6">
+                                    <label for="set-fac-email" class="form-label">Official Clinical Notifications Email</label>
+                                    <input type="email" id="set-fac-email" name="facility_email" class="form-control" value="${UI.esc(s.facility_email || '')}" ${canEdit ? '' : 'disabled'}>
+                                </div>
+                                <div class="col-12">
                                     <label for="set-crit-pol" class="form-label">Critical Result Escalation Policy</label>
                                     <textarea id="set-crit-pol" name="critical_value_policy" class="form-control" rows="2" ${canEdit ? '' : 'disabled'}>${UI.esc(s.critical_value_policy || '')}</textarea>
                                 </div>
-                                <div class="mb-3">
+                                <div class="col-12">
                                     <label for="set-rep-disc" class="form-label">Medical Report Footer Disclaimer</label>
                                     <textarea id="set-rep-disc" name="report_footer_disclaimer" class="form-control" rows="2" ${canEdit ? '' : 'disabled'}>${UI.esc(s.report_footer_disclaimer || '')}</textarea>
                                 </div>
-                                ${canEdit ? `
-                                    <button type="submit" class="btn btn-primary w-100">
+                            </div>
+                            ${canEdit ? `
+                                <div class="mt-4 pt-3 border-top d-flex justify-content-end">
+                                    <button type="submit" class="btn btn-primary">
                                         <i data-lucide="save" style="width:15px;height:15px;"></i> Save Facility Configuration
                                     </button>
-                                ` : ''}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </form>
+                `;
+            } else if (state.settingsTab === 'smtp') {
+                wrap.innerHTML = `
+                    <div class="row g-4">
+                        <div class="col-12 col-lg-7">
+                            <form id="lv-smtp-settings-form" class="lv-card" onsubmit="event.preventDefault(); LabverseAdminOps.saveSystemSettings(this);">
+                                <div class="lv-card-header d-flex justify-content-between align-items-center">
+                                    <h2 class="lv-card-title"><i data-lucide="mail" style="width:17px;height:17px;color:var(--lv-primary);"></i> SMTP Email Server Configuration</h2>
+                                    <span class="lv-badge ${isTrue(s.smtp_enabled) ? 'lv-badge-success' : 'lv-badge-neutral'}">${isTrue(s.smtp_enabled) ? 'SMTP Active' : 'Disabled'}</span>
+                                </div>
+                                <div class="lv-card-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="smtp-enabled" class="form-label">Email Notifications Status</label>
+                                            <select id="smtp-enabled" name="smtp_enabled" class="form-select" ${canEdit ? '' : 'disabled'}>
+                                                <option value="true" ${isTrue(s.smtp_enabled) ? 'selected' : ''}>Enabled (Send Clinical Emails)</option>
+                                                <option value="false" ${!isTrue(s.smtp_enabled) ? 'selected' : ''}>Disabled</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="smtp-driver" class="form-label">Mail Delivery Mode</label>
+                                            <select id="smtp-driver" name="smtp_driver" class="form-select" ${canEdit ? '' : 'disabled'}>
+                                                <option value="log" ${(s.smtp_driver || 'log') === 'log' ? 'selected' : ''}>Sandbox / Local Mail Log (Zero-Config Testing)</option>
+                                                <option value="smtp" ${s.smtp_driver === 'smtp' ? 'selected' : ''}>Live External SMTP Relay Server</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="smtp-host" class="form-label">SMTP Hostname</label>
+                                            <input type="text" id="smtp-host" name="smtp_host" class="form-control font-mono" placeholder="smtp.gmail.com / mail.yourdomain.com" value="${UI.esc(s.smtp_host || '')}" ${canEdit ? '' : 'disabled'}>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label for="smtp-port" class="form-label">SMTP Port</label>
+                                            <input type="number" id="smtp-port" name="smtp_port" class="form-control font-mono" placeholder="587" value="${UI.esc(s.smtp_port || '587')}" ${canEdit ? '' : 'disabled'}>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label for="smtp-enc" class="form-label">Encryption</label>
+                                            <select id="smtp-enc" name="smtp_encryption" class="form-select" ${canEdit ? '' : 'disabled'}>
+                                                <option value="tls" ${(s.smtp_encryption || 'tls') === 'tls' ? 'selected' : ''}>TLS (Port 587)</option>
+                                                <option value="ssl" ${s.smtp_encryption === 'ssl' ? 'selected' : ''}>SSL (Port 465)</option>
+                                                <option value="none" ${s.smtp_encryption === 'none' ? 'selected' : ''}>None</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="smtp-user" class="form-label">SMTP Username</label>
+                                            <input type="text" id="smtp-user" name="smtp_username" class="form-control font-mono" placeholder="apikey or user@domain.com" value="${UI.esc(s.smtp_username || '')}" ${canEdit ? '' : 'disabled'}>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="smtp-pass" class="form-label">SMTP Password / App Key</label>
+                                            <input type="password" id="smtp-pass" name="smtp_password" class="form-control font-mono" placeholder="••••••••••••" value="${UI.esc(s.smtp_password || '')}" ${canEdit ? '' : 'disabled'}>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="smtp-from-addr" class="form-label">From Email Address</label>
+                                            <input type="email" id="smtp-from-addr" name="smtp_from_address" class="form-control" placeholder="results@labverse.com" value="${UI.esc(s.smtp_from_address || '')}" ${canEdit ? '' : 'disabled'}>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="smtp-from-name" class="form-label">From Sender Name</label>
+                                            <input type="text" id="smtp-from-name" name="smtp_from_name" class="form-control" placeholder="Labverse Medical Diagnostics" value="${UI.esc(s.smtp_from_name || '')}" ${canEdit ? '' : 'disabled'}>
+                                        </div>
+                                    </div>
+                                    ${canEdit ? `
+                                        <div class="mt-4 pt-3 border-top d-flex justify-content-end">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i data-lucide="save" style="width:15px;height:15px;"></i> Save SMTP Settings
+                                            </button>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </form>
+                        </div>
+                        <div class="col-12 col-lg-5">
+                            <div class="lv-card">
+                                <div class="lv-card-header">
+                                    <h2 class="lv-card-title"><i data-lucide="send" style="width:17px;height:17px;color:var(--lv-secondary);"></i> Verify & Test SMTP Delivery</h2>
+                                </div>
+                                <div class="lv-card-body">
+                                    <p class="small text-secondary mb-3">
+                                        Send a test clinical email using the current form parameters to verify your SMTP server or Sandbox Mailer before enabling live patient report dispatches.
+                                    </p>
+                                    <form onsubmit="event.preventDefault(); LabverseAdminOps.sendTestEmailNow();">
+                                        <div class="mb-3">
+                                            <label for="test-email-recipient" class="form-label">Recipient Email Address</label>
+                                            <input type="email" id="test-email-recipient" class="form-control" required placeholder="doctor@hospital.org" value="${UI.esc(window.LabverseApp.getCurrentUser()?.email || 'admin@labverse.com')}">
+                                        </div>
+                                        <button type="submit" id="btn-test-smtp" class="btn btn-outline-primary w-100">
+                                            <i data-lucide="mail-check" style="width:15px;height:15px;"></i> Send Live Test Email
+                                        </button>
+                                    </form>
+                                    <div id="test-email-result-box" class="mt-3"></div>
+                                </div>
                             </div>
-                        </form>
+                        </div>
                     </div>
-
-                    <div class="col-12 col-lg-7">
-                        <div class="lv-card">
-                            <div class="lv-card-header">
-                                <h2 class="lv-card-title"><i data-lucide="shield-alert" style="width:17px;height:17px;color:var(--lv-secondary);"></i> Immutable Security & Clinical Audit Trail</h2>
+                `;
+            } else if (state.settingsTab === 'sms') {
+                wrap.innerHTML = `
+                    <div class="row g-4">
+                        <div class="col-12 col-lg-7">
+                            <form id="lv-sms-settings-form" class="lv-card" onsubmit="event.preventDefault(); LabverseAdminOps.saveSystemSettings(this);">
+                                <div class="lv-card-header d-flex justify-content-between align-items-center">
+                                    <h2 class="lv-card-title"><i data-lucide="message-square" style="width:17px;height:17px;color:var(--lv-primary);"></i> SMS Gateway Configuration</h2>
+                                    <span class="lv-badge ${isTrue(s.sms_enabled) ? 'lv-badge-success' : 'lv-badge-neutral'}">${isTrue(s.sms_enabled) ? `Active (${(s.sms_provider || 'sandbox').toUpperCase()})` : 'Disabled'}</span>
+                                </div>
+                                <div class="lv-card-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="sms-enabled" class="form-label">SMS Notification Pipeline</label>
+                                            <select id="sms-enabled" name="sms_enabled" class="form-select" ${canEdit ? '' : 'disabled'}>
+                                                <option value="true" ${isTrue(s.sms_enabled) ? 'selected' : ''}>Enabled (Send Patient & Alert SMS)</option>
+                                                <option value="false" ${!isTrue(s.sms_enabled) ? 'selected' : ''}>Disabled</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="sms-provider" class="form-label">SMS Gateway Provider</label>
+                                            <select id="sms-provider" name="sms_provider" class="form-select" ${canEdit ? '' : 'disabled'}>
+                                                <option value="sandbox" ${(s.sms_provider || 'sandbox') === 'sandbox' ? 'selected' : ''}>Sandbox Simulator (Zero-Cost Local Outbox)</option>
+                                                <option value="arkesel" ${s.sms_provider === 'arkesel' ? 'selected' : ''}>Arkesel SMS (Ghana & West Africa V2 API)</option>
+                                                <option value="mnotify" ${s.sms_provider === 'mnotify' ? 'selected' : ''}>mNotify BMS (Ghana Quick SMS API)</option>
+                                                <option value="hubtel" ${s.sms_provider === 'hubtel' ? 'selected' : ''}>Hubtel SMS Gateway</option>
+                                                <option value="termii" ${s.sms_provider === 'termii' ? 'selected' : ''}>Termii Messaging Gateway</option>
+                                                <option value="twilio" ${s.sms_provider === 'twilio' ? 'selected' : ''}>Twilio Programmable SMS</option>
+                                                <option value="custom_webhook" ${s.sms_provider === 'custom_webhook' ? 'selected' : ''}>Custom REST HTTP Webhook</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="sms-sender" class="form-label">Sender ID (Max 11 Chars)</label>
+                                            <input type="text" id="sms-sender" name="sms_sender_id" maxlength="11" class="form-control font-mono" placeholder="LABVERSE" value="${UI.esc(s.sms_sender_id || 'LABVERSE')}" ${canEdit ? '' : 'disabled'}>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <label for="sms-key" class="form-label">Gateway API Key / Auth Token / Client Secret</label>
+                                            <input type="password" id="sms-key" name="sms_api_key" class="form-control font-mono" placeholder="Enter provider API key or token..." value="${UI.esc(s.sms_api_key || '')}" ${canEdit ? '' : 'disabled'}>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="sms-secret" class="form-label">Client ID / Account SID (For Hubtel or Twilio)</label>
+                                            <input type="text" id="sms-secret" name="sms_api_secret" class="form-control font-mono" placeholder="Optional unless using Hubtel or Twilio" value="${UI.esc(s.sms_api_secret || '')}" ${canEdit ? '' : 'disabled'}>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="sms-webhook" class="form-label">Custom Webhook URL (If Custom HTTP selected)</label>
+                                            <input type="url" id="sms-webhook" name="sms_webhook_url" class="form-control font-mono" placeholder="https://sms-gateway.example.com/send" value="${UI.esc(s.sms_webhook_url || '')}" ${canEdit ? '' : 'disabled'}>
+                                        </div>
+                                    </div>
+                                    ${canEdit ? `
+                                        <div class="mt-4 pt-3 border-top d-flex justify-content-end">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i data-lucide="save" style="width:15px;height:15px;"></i> Save SMS Gateway Settings
+                                            </button>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </form>
+                        </div>
+                        <div class="col-12 col-lg-5">
+                            <div class="lv-card">
+                                <div class="lv-card-header">
+                                    <h2 class="lv-card-title"><i data-lucide="smartphone" style="width:17px;height:17px;color:var(--lv-secondary);"></i> Send Test SMS Message</h2>
+                                </div>
+                                <div class="lv-card-body">
+                                    <p class="small text-secondary mb-3">
+                                        Test SMS dispatch to any phone number. Numbers starting with <code>024...</code> are automatically normalized to international format (<code>+23324...</code>).
+                                    </p>
+                                    <form onsubmit="event.preventDefault(); LabverseAdminOps.sendTestSmsNow();">
+                                        <div class="mb-3">
+                                            <label for="test-sms-recipient" class="form-label">Recipient Mobile Number</label>
+                                            <input type="tel" id="test-sms-recipient" class="form-control font-mono" required placeholder="+233 244 100 001" value="${UI.esc(s.facility_phone || '+233 244 100 001')}">
+                                        </div>
+                                        <button type="submit" id="btn-test-sms" class="btn btn-outline-primary w-100">
+                                            <i data-lucide="send" style="width:15px;height:15px;"></i> Dispatch Test SMS
+                                        </button>
+                                    </form>
+                                    <div id="test-sms-result-box" class="mt-3"></div>
+                                </div>
                             </div>
-                            <div class="lv-table-container">
+                        </div>
+                    </div>
+                `;
+            } else if (state.settingsTab === 'triggers') {
+                wrap.innerHTML = `
+                    <form class="lv-card" onsubmit="event.preventDefault(); LabverseAdminOps.saveTriggerSettings(this);">
+                        <div class="lv-card-header">
+                            <h2 class="lv-card-title"><i data-lucide="bell-ring" style="width:17px;height:17px;color:var(--lv-primary);"></i> Automated Clinical Notification Triggers & Message Templates</h2>
+                        </div>
+                        <div class="lv-card-body">
+                            <div class="p-3 rounded bg-light border small mb-4">
+                                <strong>Available Template Placeholders:</strong>
+                                <span class="font-mono ms-1">{facility_name}</span>,
+                                <span class="font-mono">{patient_name}</span>,
+                                <span class="font-mono">{patient_code}</span>,
+                                <span class="font-mono">{order_number}</span>,
+                                <span class="font-mono">{report_number}</span>,
+                                <span class="font-mono">{verification_code}</span>,
+                                <span class="font-mono">{receipt_number}</span>,
+                                <span class="font-mono">{amount}</span>,
+                                <span class="font-mono">{balance_due}</span>,
+                                <span class="font-mono">{test_name}</span>
+                            </div>
+
+                            <div class="lv-table-container mb-4">
                                 <table class="lv-table">
                                     <thead>
                                         <tr>
-                                            <th>Timestamp</th>
-                                            <th>Staff User</th>
-                                            <th>Module / Action</th>
-                                            <th>Reference</th>
-                                            <th>Audit Description</th>
+                                            <th style="width:26%;">Clinical Lifecycle Event</th>
+                                            <th style="width:12%;">Send SMS</th>
+                                            <th style="width:12%;">Send Email</th>
+                                            <th style="width:50%;">Customizable SMS / Alert Message Template</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        ${logs.map(l => `
-                                            <tr>
-                                                <td class="small text-nowrap">${UI.formatDateTime(l.created_at)}</td>
-                                                <td class="small">
-                                                    <div class="fw-semibold">${UI.esc(l.user?.name || 'System')}</div>
-                                                    <div class="text-secondary font-mono">${UI.esc(l.user?.staff_id || '')}</div>
-                                                </td>
-                                                <td>
-                                                    <span class="lv-badge lv-badge-neutral">${UI.esc(l.module)}</span>
-                                                    <span class="d-block font-mono text-secondary mt-1" style="font-size:0.72rem;">${UI.esc(l.action)}</span>
-                                                </td>
-                                                <td class="font-mono small fw-semibold text-primary">${UI.esc(l.target_reference || '—')}</td>
-                                                <td class="small">${UI.esc(l.description)}</td>
-                                            </tr>
-                                        `).join('')}
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold">1. Patient Registration Welcome</div>
+                                                <div class="small text-secondary">Sent when a new patient profile is created with their Medical Record ID.</div>
+                                            </td>
+                                            <td>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" id="trig-pat-sms" data-setting-key="notify_patient_welcome_sms" ${isTrue(s.notify_patient_welcome_sms) ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" id="trig-pat-email" data-setting-key="notify_patient_welcome_email" ${isTrue(s.notify_patient_welcome_email) ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <textarea name="tpl_sms_patient_welcome" class="form-control form-control-sm" rows="2" ${canEdit ? '' : 'disabled'}>${UI.esc(s.tpl_sms_patient_welcome || '')}</textarea>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold">2. Test Order Registered</div>
+                                                <div class="small text-secondary">Sent when diagnostic tests are ordered for a patient.</div>
+                                            </td>
+                                            <td>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" id="trig-ord-sms" data-setting-key="notify_order_placed_sms" ${isTrue(s.notify_order_placed_sms) ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" id="trig-ord-email" data-setting-key="notify_order_placed_email" ${isTrue(s.notify_order_placed_email) ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <textarea name="tpl_sms_order_placed" class="form-control form-control-sm" rows="2" ${canEdit ? '' : 'disabled'}>${UI.esc(s.tpl_sms_order_placed || '')}</textarea>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold">3. Official Report Verified & Released</div>
+                                                <div class="small text-secondary">Sent automatically when all tests on an order are approved and released.</div>
+                                            </td>
+                                            <td>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" id="trig-rep-sms" data-setting-key="notify_report_released_sms" ${isTrue(s.notify_report_released_sms) ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" id="trig-rep-email" data-setting-key="notify_report_released_email" ${isTrue(s.notify_report_released_email) ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <textarea name="tpl_sms_report_released" class="form-control form-control-sm" rows="2" ${canEdit ? '' : 'disabled'}>${UI.esc(s.tpl_sms_report_released || '')}</textarea>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold text-danger">4. Critical / Panic Value Escalation</div>
+                                                <div class="small text-secondary">Immediate alert when a scientist submits a panic/critical laboratory result.</div>
+                                            </td>
+                                            <td>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" id="trig-crit-sms" data-setting-key="notify_critical_result_sms" ${isTrue(s.notify_critical_result_sms) ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" id="trig-crit-email" data-setting-key="notify_critical_result_email" ${isTrue(s.notify_critical_result_email) ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <textarea name="tpl_sms_critical_result" class="form-control form-control-sm" rows="2" ${canEdit ? '' : 'disabled'}>${UI.esc(s.tpl_sms_critical_result || '')}</textarea>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold">5. Cashier Payment Receipt</div>
+                                                <div class="small text-secondary">Sent when a patient payment is recorded by the cashier.</div>
+                                            </td>
+                                            <td>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" id="trig-pay-sms" data-setting-key="notify_payment_receipt_sms" ${isTrue(s.notify_payment_receipt_sms) ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" id="trig-pay-email" data-setting-key="notify_payment_receipt_email" ${isTrue(s.notify_payment_receipt_email) ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <textarea name="tpl_sms_payment_receipt" class="form-control form-control-sm" rows="2" ${canEdit ? '' : 'disabled'}>${UI.esc(s.tpl_sms_payment_receipt || '')}</textarea>
+                                            </td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
+
+                            ${canEdit ? `
+                                <div class="d-flex justify-content-end">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i data-lucide="save" style="width:15px;height:15px;"></i> Save Notification Triggers & Templates
+                                    </button>
+                                </div>
+                            ` : ''}
                         </div>
+                    </form>
+                `;
+            }
+
+            UI.refreshIcons();
+        } catch (err) {
+            UI.toast(err.message, 'error');
+        }
+    }
+
+    async function renderCommunicationOutboxTab() {
+        const wrap = document.getElementById('lv-settings-body');
+        if (!wrap) return;
+
+        try {
+            const channelFilter = state.commChannelFilter || '';
+            const searchFilter = state.commSearchFilter || '';
+            const res = await UI.api(`/communications/logs?channel=${encodeURIComponent(channelFilter)}&search=${encodeURIComponent(searchFilter)}`);
+            const rows = res.logs?.data || [];
+            const sum = res.summary || {};
+
+            wrap.innerHTML = `
+                <div class="row g-3 mb-3">
+                    <div class="col-6 col-md-3">
+                        <div class="lv-kpi-card">
+                            <div class="lv-kpi-label">Total Dispatches</div>
+                            <div class="lv-kpi-value">${sum.total || 0}</div>
+                            <div class="lv-kpi-sub">All SMS & Email events</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="lv-kpi-card">
+                            <div class="lv-kpi-label">SMS Notifications</div>
+                            <div class="lv-kpi-value text-primary">${sum.sms_count || 0}</div>
+                            <div class="lv-kpi-sub">Patient & critical alerts</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="lv-kpi-card">
+                            <div class="lv-kpi-label">SMTP Emails</div>
+                            <div class="lv-kpi-value" style="color:var(--lv-secondary);">${sum.email_count || 0}</div>
+                            <div class="lv-kpi-sub">Formatted HTML reports</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="lv-kpi-card">
+                            <div class="lv-kpi-label">Failed / Attention</div>
+                            <div class="lv-kpi-value text-danger">${sum.failed_count || 0}</div>
+                            <div class="lv-kpi-sub">${sum.sent_count || 0} live • ${sum.simulated_count || 0} sandbox</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lv-filter-bar d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div class="d-flex gap-1">
+                        <button type="button" class="btn btn-sm ${!channelFilter ? 'btn-primary' : 'btn-light-surface'}" onclick="LabverseAdminOps.filterCommLogs('')">All Channels</button>
+                        <button type="button" class="btn btn-sm ${channelFilter === 'sms' ? 'btn-primary' : 'btn-light-surface'}" onclick="LabverseAdminOps.filterCommLogs('sms')">SMS Only</button>
+                        <button type="button" class="btn btn-sm ${channelFilter === 'email' ? 'btn-primary' : 'btn-light-surface'}" onclick="LabverseAdminOps.filterCommLogs('email')">Email Only</button>
+                    </div>
+                    <div style="min-width:280px;">
+                        <input type="search" class="form-control form-control-sm" placeholder="Search recipient phone, email, or ref code..." value="${UI.esc(searchFilter)}" oninput="LabverseAdminOps.searchCommLogs(this.value)">
+                    </div>
+                </div>
+
+                <div class="lv-card">
+                    <div class="lv-table-container">
+                        <table class="lv-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Channel & Provider</th>
+                                    <th>Event & Ref</th>
+                                    <th>Recipient</th>
+                                    <th>Message / Subject Preview</th>
+                                    <th>Delivery Status</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rows.length === 0 ? `
+                                    <tr><td colspan="7" class="text-center py-4 text-secondary">No communication logs found.</td></tr>
+                                ` : rows.map(l => `
+                                    <tr>
+                                        <td class="small text-nowrap">${UI.formatDateTime(l.sent_at || l.created_at)}</td>
+                                        <td>
+                                            <span class="lv-badge ${l.channel === 'sms' ? 'lv-badge-info' : 'lv-badge-teal'} text-uppercase">${UI.esc(l.channel)}</span>
+                                            <span class="d-block font-mono text-secondary mt-1" style="font-size:0.72rem;">${UI.esc(l.provider)}</span>
+                                        </td>
+                                        <td>
+                                            <div class="font-mono small fw-semibold text-primary">${UI.esc(l.reference_code || '—')}</div>
+                                            <div class="small text-secondary">${UI.esc(l.event_type)}</div>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold small">${UI.esc(l.recipient_name || 'Recipient')}</div>
+                                            <div class="font-mono small text-secondary">${UI.esc(l.recipient)}</div>
+                                        </td>
+                                        <td style="max-width:340px;">
+                                            ${l.subject ? `<div class="fw-semibold small">${UI.esc(l.subject)}</div>` : ''}
+                                            <div class="small text-secondary text-truncate" title="${UI.esc(l.message)}">${UI.esc(l.message)}</div>
+                                            <div class="text-secondary font-mono" style="font-size:0.7rem;">${UI.esc(l.provider_response || '')}</div>
+                                        </td>
+                                        <td>
+                                            <span class="lv-badge ${l.status === 'sent' ? 'lv-badge-success' : (l.status === 'failed' ? 'lv-badge-danger' : 'lv-badge-info')}">
+                                                ${UI.esc(l.status.toUpperCase())}
+                                            </span>
+                                        </td>
+                                        <td class="text-end">
+                                            <button type="button" class="btn btn-light-surface btn-sm" onclick="LabverseAdminOps.retryCommLog(${l.id})">
+                                                <i data-lucide="refresh-cw" style="width:13px;height:13px;"></i> Resend
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             `;
             UI.refreshIcons();
+        } catch (err) {
+            UI.toast(err.message, 'error');
+        }
+    }
+
+    async function renderAuditLogsTab() {
+        const wrap = document.getElementById('lv-settings-body');
+        if (!wrap) return;
+
+        try {
+            const auditRes = await UI.api('/audit-logs');
+            const logs = auditRes.data || [];
+
+            wrap.innerHTML = `
+                <div class="lv-card">
+                    <div class="lv-card-header">
+                        <h2 class="lv-card-title"><i data-lucide="shield-alert" style="width:17px;height:17px;color:var(--lv-secondary);"></i> Immutable Security & Clinical Audit Trail</h2>
+                    </div>
+                    <div class="lv-table-container">
+                        <table class="lv-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Staff User</th>
+                                    <th>Module / Action</th>
+                                    <th>Reference</th>
+                                    <th>Audit Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${logs.map(l => `
+                                    <tr>
+                                        <td class="small text-nowrap">${UI.formatDateTime(l.created_at)}</td>
+                                        <td class="small">
+                                            <div class="fw-semibold">${UI.esc(l.user?.name || 'System')}</div>
+                                            <div class="text-secondary font-mono">${UI.esc(l.user?.staff_id || '')}</div>
+                                        </td>
+                                        <td>
+                                            <span class="lv-badge lv-badge-neutral">${UI.esc(l.module)}</span>
+                                            <span class="d-block font-mono text-secondary mt-1" style="font-size:0.72rem;">${UI.esc(l.action)}</span>
+                                        </td>
+                                        <td class="font-mono small fw-semibold text-primary">${UI.esc(l.target_reference || '—')}</td>
+                                        <td class="small">${UI.esc(l.description)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            UI.refreshIcons();
+        } catch (err) {
+            UI.toast(err.message, 'error');
+        }
+    }
+
+    function filterCommLogs(channel) {
+        state.commChannelFilter = channel;
+        renderCommunicationOutboxTab();
+    }
+
+    function searchCommLogs(q) {
+        state.commSearchFilter = q;
+        renderCommunicationOutboxTab();
+    }
+
+    async function retryCommLog(logId) {
+        try {
+            const res = await UI.api(`/communications/logs/${logId}/retry`, { method: 'POST' });
+            UI.toast(res.message, 'success');
+            renderCommunicationOutboxTab();
         } catch (err) {
             UI.toast(err.message, 'error');
         }
@@ -1096,8 +1599,70 @@ window.LabverseAdminOps = (function () {
         try {
             const res = await UI.api('/settings', { method: 'PUT', body: { settings } });
             UI.toast(res.message, 'success');
+            renderSettings(state.settingsTab);
         } catch (err) {
             UI.toast(err.message, 'error');
+        }
+    }
+
+    async function saveTriggerSettings(form) {
+        const settings = Object.fromEntries(new FormData(form).entries());
+        form.querySelectorAll('input[type="checkbox"][data-setting-key]').forEach(chk => {
+            settings[chk.getAttribute('data-setting-key')] = chk.checked ? 'true' : 'false';
+        });
+        try {
+            const res = await UI.api('/settings', { method: 'PUT', body: { settings } });
+            UI.toast(res.message, 'success');
+        } catch (err) {
+            UI.toast(err.message, 'error');
+        }
+    }
+
+    async function sendTestEmailNow() {
+        const recipient = document.getElementById('test-email-recipient')?.value?.trim();
+        const form = document.getElementById('lv-smtp-settings-form');
+        const settings = form ? Object.fromEntries(new FormData(form).entries()) : {};
+        const box = document.getElementById('test-email-result-box');
+
+        if (box) box.innerHTML = `<div class="small text-secondary">Dispatching test email...</div>`;
+        try {
+            const res = await UI.api('/communications/test-email', {
+                method: 'POST',
+                body: { recipient_email: recipient, settings },
+            });
+            UI.toast(res.message, 'success');
+            if (box) {
+                box.innerHTML = `<div class="p-2 rounded border bg-light small text-success"><strong>Success:</strong> ${UI.esc(res.message)}<br><span class="text-secondary font-mono">${UI.esc(res.log?.provider_response || '')}</span></div>`;
+            }
+        } catch (err) {
+            UI.toast(err.message, 'error');
+            if (box) {
+                box.innerHTML = `<div class="p-2 rounded border bg-light small text-danger"><strong>Failed:</strong> ${UI.esc(err.message)}</div>`;
+            }
+        }
+    }
+
+    async function sendTestSmsNow() {
+        const recipient = document.getElementById('test-sms-recipient')?.value?.trim();
+        const form = document.getElementById('lv-sms-settings-form');
+        const settings = form ? Object.fromEntries(new FormData(form).entries()) : {};
+        const box = document.getElementById('test-sms-result-box');
+
+        if (box) box.innerHTML = `<div class="small text-secondary">Dispatching test SMS...</div>`;
+        try {
+            const res = await UI.api('/communications/test-sms', {
+                method: 'POST',
+                body: { recipient_phone: recipient, settings },
+            });
+            UI.toast(res.message, 'success');
+            if (box) {
+                box.innerHTML = `<div class="p-2 rounded border bg-light small text-success"><strong>Success:</strong> ${UI.esc(res.message)}<br><span class="text-secondary font-mono">${UI.esc(res.log?.provider_response || '')}</span></div>`;
+            }
+        } catch (err) {
+            UI.toast(err.message, 'error');
+            if (box) {
+                box.innerHTML = `<div class="p-2 rounded border bg-light small text-danger"><strong>Failed:</strong> ${UI.esc(err.message)}</div>`;
+            }
         }
     }
 
@@ -1125,6 +1690,12 @@ window.LabverseAdminOps = (function () {
         submitCatalogueTest,
         renderSettings,
         saveSystemSettings,
+        saveTriggerSettings,
+        sendTestEmailNow,
+        sendTestSmsNow,
+        filterCommLogs,
+        searchCommLogs,
+        retryCommLog,
     };
 })();
 

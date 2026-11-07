@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\EnforcesBranchAccess;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Branch;
+use App\Models\CommunicationLog;
 use App\Models\InventoryItem;
 use App\Models\LabOrder;
 use App\Models\LabReport;
@@ -18,6 +19,7 @@ use App\Models\SystemNotification;
 use App\Models\SystemSetting;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\CommunicationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -401,8 +403,7 @@ class AdminController extends Controller
 
     public function settings(Request $request): JsonResponse
     {
-        $settings = SystemSetting::pluck('value', 'key');
-        return response()->json(['settings' => $settings]);
+        return response()->json(['settings' => CommunicationService::getConfig()]);
     }
 
     public function updateSettings(Request $request): JsonResponse
@@ -412,9 +413,18 @@ class AdminController extends Controller
         ]);
 
         foreach ($validated['settings'] as $key => $value) {
+            $group = 'facility';
+            if (str_starts_with($key, 'smtp_')) {
+                $group = 'smtp';
+            } elseif (str_starts_with($key, 'sms_')) {
+                $group = 'sms';
+            } elseif (str_starts_with($key, 'notify_') || str_starts_with($key, 'tpl_')) {
+                $group = 'notifications';
+            }
+
             SystemSetting::updateOrCreate(
                 ['key' => $key],
-                ['value' => (string) $value, 'group' => 'facility']
+                ['value' => is_bool($value) ? ($value ? 'true' : 'false') : (string) $value, 'group' => $group]
             );
         }
 
@@ -422,12 +432,192 @@ class AdminController extends Controller
             $request,
             'settings.updated',
             'Settings',
-            'Updated laboratory facility & clinical policy configuration.'
+            'Updated laboratory facility, SMTP email, and SMS gateway configuration.'
         );
 
         return response()->json([
-            'message' => 'Laboratory system settings saved successfully.',
-            'settings' => SystemSetting::pluck('value', 'key'),
+            'message' => 'Laboratory system & communication settings saved successfully.',
+            'settings' => CommunicationService::getConfig(),
+        ]);
+    }
+
+    // =========================================================================
+    // SMTP & SMS COMMUNICATION OUTBOX & TESTING
+    // =========================================================================
+    public function communicationLogs(Request $request): JsonResponse
+    {
+        $branchId = $this->resolveEffectiveBranchId($request);
+
+        $query = CommunicationLog::with([
+            'patient:id,patient_code,first_name,last_name,phone,email',
+            'branch:id,code,name',
+            'triggeredByUser:id,name,staff_id',
+        ]);
+
+        if ($branchId) {
+            $query->where(function ($sub) use ($branchId) {
+                $sub->where('branch_id', $branchId)->orWhereNull('branch_id');
+            });
+        }
+
+        if ($channel = $request->input('channel')) {
+            $query->where('channel', $channel);
+        }
+
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+
+        if ($search = trim((string) $request->input('search', ''))) {
+            $query->where(function ($sub) use ($search) {
+                $sub->where('recipient', 'like', "%{$search}%")
+                    ->orWhere('recipient_name', 'like', "%{$search}%")
+                    ->orWhere('reference_code', 'like', "%{$search}%")
+                    ->orWhere('subject', 'like', "%{$search}%")
+                    ->orWhere('message', 'like', "%{$search}%");
+            });
+        }
+
+        $baseStats = CommunicationLog::when($branchId, fn ($q) => $q->where(function ($sub) use ($branchId) {
+            $sub->where('branch_id', $branchId)->orWhereNull('branch_id');
+        }));
+
+        return response()->json([
+            'logs' => $query->latest()->paginate(20),
+            'summary' => [
+                'total' => (clone $baseStats)->count(),
+                'sms_count' => (clone $baseStats)->where('channel', 'sms')->count(),
+                'email_count' => (clone $baseStats)->where('channel', 'email')->count(),
+                'sent_count' => (clone $baseStats)->where('status', 'sent')->count(),
+                'simulated_count' => (clone $baseStats)->where('status', 'simulated')->count(),
+                'failed_count' => (clone $baseStats)->where('status', 'failed')->count(),
+            ],
+        ]);
+    }
+
+    public function sendTestEmail(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'recipient_email' => ['required', 'email', 'max:160'],
+            'settings' => ['nullable', 'array'],
+        ]);
+
+        $user = $request->user();
+        $cfg = CommunicationService::getConfig();
+        $facilityName = $cfg['facility_name'] ?? 'LABVERSE Diagnostics';
+
+        $subject = "LABVERSE SMTP Connectivity Test — {$facilityName}";
+        $body = "Hello {$user->name},\n\n"
+            . "This is a live test email dispatched from {$facilityName} (LABVERSE v2.0 Enterprise LIMS).\n\n"
+            . "• Dispatched By: {$user->name} ({$user->staff_id})\n"
+            . "• Timestamp: " . now()->format('Y-m-d H:i:s T') . "\n"
+            . "• Configured Driver: " . strtoupper(($validated['settings']['smtp_driver'] ?? $cfg['smtp_driver'] ?? 'log')) . "\n"
+            . "• SMTP Host: " . ($validated['settings']['smtp_host'] ?? $cfg['smtp_host'] ?? 'N/A') . "\n\n"
+            . "Your laboratory email notification pipeline is operational.";
+
+        $log = CommunicationService::sendEmail(
+            $validated['recipient_email'],
+            $subject,
+            $body,
+            [
+                'branch_id' => $user->branch_id,
+                'triggered_by' => $user->id,
+                'recipient_name' => $user->name,
+                'event_type' => 'manual.test_email',
+                'reference_type' => 'SystemSetting',
+                'reference_code' => 'SMTP-TEST',
+            ],
+            $validated['settings'] ?? null
+        );
+
+        AuditService::log(
+            $request,
+            'communication.test_email',
+            'Settings',
+            "Dispatched test email to {$validated['recipient_email']} (Status: {$log->status})."
+        );
+
+        return response()->json([
+            'message' => $log->status === 'failed'
+                ? "Test email failed: {$log->provider_response}"
+                : "Test email dispatched to {$validated['recipient_email']} ({$log->status}).",
+            'log' => $log,
+        ], $log->status === 'failed' ? 422 : 200);
+    }
+
+    public function sendTestSms(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'recipient_phone' => ['required', 'string', 'max:40'],
+            'settings' => ['nullable', 'array'],
+        ]);
+
+        $user = $request->user();
+        $cfg = CommunicationService::getConfig();
+        $facilityName = $cfg['facility_name'] ?? 'LABVERSE Diagnostics';
+
+        $message = "LABVERSE SMS TEST ({$facilityName}): Your laboratory SMS notification gateway is active. Dispatched by {$user->name} at " . now()->format('H:i') . ".";
+
+        $log = CommunicationService::sendSms(
+            $validated['recipient_phone'],
+            $message,
+            [
+                'branch_id' => $user->branch_id,
+                'triggered_by' => $user->id,
+                'recipient_name' => $user->name,
+                'event_type' => 'manual.test_sms',
+                'reference_type' => 'SystemSetting',
+                'reference_code' => 'SMS-TEST',
+            ],
+            $validated['settings'] ?? null
+        );
+
+        AuditService::log(
+            $request,
+            'communication.test_sms',
+            'Settings',
+            "Dispatched test SMS to {$validated['recipient_phone']} via {$log->provider} (Status: {$log->status})."
+        );
+
+        return response()->json([
+            'message' => $log->status === 'failed'
+                ? "Test SMS failed: {$log->provider_response}"
+                : "Test SMS dispatched to {$log->recipient} via " . strtoupper($log->provider) . " ({$log->status}).",
+            'log' => $log,
+        ], $log->status === 'failed' ? 422 : 200);
+    }
+
+    public function retryCommunication(Request $request, CommunicationLog $communicationLog): JsonResponse
+    {
+        $user = $request->user();
+        $context = [
+            'branch_id' => $communicationLog->branch_id ?? $user->branch_id,
+            'patient_id' => $communicationLog->patient_id,
+            'triggered_by' => $user->id,
+            'recipient_name' => $communicationLog->recipient_name,
+            'event_type' => $communicationLog->event_type,
+            'reference_type' => $communicationLog->reference_type,
+            'reference_code' => $communicationLog->reference_code,
+        ];
+
+        if ($communicationLog->channel === 'email') {
+            $newLog = CommunicationService::sendEmail(
+                $communicationLog->recipient,
+                $communicationLog->subject ?? 'LABVERSE Notification',
+                $communicationLog->message,
+                $context
+            );
+        } else {
+            $newLog = CommunicationService::sendSms(
+                $communicationLog->recipient,
+                $communicationLog->message,
+                $context
+            );
+        }
+
+        return response()->json([
+            'message' => "Resent {$newLog->channel} notification to {$newLog->recipient} ({$newLog->status}).",
+            'log' => $newLog,
         ]);
     }
 }

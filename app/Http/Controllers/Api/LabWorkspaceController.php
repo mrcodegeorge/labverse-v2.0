@@ -10,6 +10,7 @@ use App\Models\LabReport;
 use App\Models\TestParameter;
 use App\Models\TestResult;
 use App\Services\AuditService;
+use App\Services\CommunicationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -248,6 +249,7 @@ class LabWorkspaceController extends Controller
                     'approvals',
                     $labOrderItem->order?->order_number
                 );
+                CommunicationService::notifyCriticalResult($labOrderItem, $user->id);
             }
 
             AuditService::log(
@@ -474,7 +476,7 @@ class LabWorkspaceController extends Controller
 
             // Automatically generate or update the authorized LabReport once ALL order items are approved
             $nextRepSeq = (LabReport::max('id') ?? 0) + 1;
-            LabReport::updateOrCreate(
+            $report = LabReport::updateOrCreate(
                 ['lab_order_id' => $order->id],
                 [
                     'report_number' => $order->report?->report_number ?? sprintf('RPT-%s-%04d', date('Ymd'), $nextRepSeq),
@@ -488,6 +490,8 @@ class LabWorkspaceController extends Controller
                     'released_at' => now(),
                 ]
             );
+
+            CommunicationService::notifyReportReleased($report, $approverId);
         } elseif ($items->contains(fn ($i) => $i->status === 'submitted')) {
             $order->update(['status' => 'awaiting_approval']);
         } elseif ($items->contains(fn ($i) => in_array($i->status, ['in_progress', 'draft_saved', 'correction_requested', 'awaiting_processing']))) {

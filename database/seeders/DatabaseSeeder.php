@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\AuditLog;
 use App\Models\Branch;
+use App\Models\CommunicationLog;
 use App\Models\InventoryItem;
 use App\Models\LabOrder;
 use App\Models\LabOrderItem;
@@ -21,8 +22,10 @@ use App\Models\TestCategory;
 use App\Models\TestParameter;
 use App\Models\TestResult;
 use App\Models\User;
+use App\Services\CommunicationService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 class DatabaseSeeder extends Seeder
 {
@@ -1413,5 +1416,73 @@ class DatabaseSeeder extends Seeder
             'description' => 'Approved results and released official diagnostic report RPT-20261107-0001 for Kofi Agyeman-Prempeh.',
             'ip_address' => '192.168.10.5',
         ]);
+
+        // Seed default SMTP & SMS settings if not already set
+        foreach (CommunicationService::defaultSettings() as $k => $v) {
+            SystemSetting::firstOrCreate(
+                ['key' => $k],
+                ['value' => (string) $v, 'group' => str_starts_with($k, 'smtp_') ? 'smtp' : (str_starts_with($k, 'sms_') ? 'sms' : 'notifications')]
+            );
+        }
+
+        // Seed initial SMS & Email communication outbox history
+        if (Schema::hasTable('communication_logs')) {
+            $pat1 = $patients['LV-2026-0001'];
+            $pat3 = $patients['LV-2026-0003'];
+
+            CommunicationLog::create([
+                'branch_id' => $accraBranch->id,
+                'patient_id' => $pat1->id,
+                'triggered_by' => $supervisorUser->id,
+                'channel' => 'sms',
+                'provider' => 'sandbox',
+                'event_type' => 'report.released',
+                'recipient' => $pat1->phone,
+                'recipient_name' => $pat1->full_name,
+                'subject' => null,
+                'message' => "Hello {$pat1->full_name}, your official medical laboratory report RPT-20261107-0001 (Order {$order1->order_number}) is ready at LABVERSE DIAGNOSTIC & REFERENCE LABORATORIES LTD.",
+                'reference_type' => 'LabReport',
+                'reference_code' => 'RPT-20261107-0001',
+                'status' => 'simulated',
+                'provider_response' => 'Simulated SMS dispatch (Sender: LABVERSE).',
+                'sent_at' => now()->subMinutes(15),
+            ]);
+
+            CommunicationLog::create([
+                'branch_id' => $accraBranch->id,
+                'patient_id' => $pat1->id,
+                'triggered_by' => $supervisorUser->id,
+                'channel' => 'email',
+                'provider' => 'sandbox',
+                'event_type' => 'report.released',
+                'recipient' => $pat1->email ?: 'kofi.prempeh@example.com',
+                'recipient_name' => $pat1->full_name,
+                'subject' => 'Official Medical Laboratory Report Ready — RPT-20261107-0001',
+                'message' => "Dear {$pat1->full_name}, Your official diagnostic laboratory report RPT-20261107-0001 has been verified and released.",
+                'reference_type' => 'LabReport',
+                'reference_code' => 'RPT-20261107-0001',
+                'status' => 'simulated',
+                'provider_response' => 'Captured in LABVERSE Mail Sandbox.',
+                'sent_at' => now()->subMinutes(15),
+            ]);
+
+            CommunicationLog::create([
+                'branch_id' => $accraBranch->id,
+                'patient_id' => $pat3->id,
+                'triggered_by' => $scientistUser->id,
+                'channel' => 'sms',
+                'provider' => 'sandbox',
+                'event_type' => 'result.critical',
+                'recipient' => '+233302784100',
+                'recipient_name' => $pat3->full_name,
+                'subject' => null,
+                'message' => "URGENT CLINICAL ALERT: Critical diagnostic value (Glucose 24.6 mmol/L) detected for {$pat3->full_name} ({$pat3->patient_code}). Immediate review required.",
+                'reference_type' => 'LabOrder',
+                'reference_code' => $order2->order_number,
+                'status' => 'simulated',
+                'provider_response' => 'Critical Value Escalation SMS dispatched.',
+                'sent_at' => now()->subMinutes(8),
+            ]);
+        }
     }
 }

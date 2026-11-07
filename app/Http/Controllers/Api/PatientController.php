@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\EnforcesBranchAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Patient;
 use App\Services\AuditService;
+use App\Services\CommunicationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -152,6 +153,8 @@ class PatientController extends Controller
             null,
             $patient->branch_id
         );
+
+        CommunicationService::notifyPatientWelcome($patient, $user->id);
 
         return response()->json([
             'message' => 'Patient registered successfully.',

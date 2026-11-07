@@ -8,6 +8,7 @@ use App\Models\LabOrder;
 use App\Models\LabReport;
 use App\Models\SystemSetting;
 use App\Services\AuditService;
+use App\Services\CommunicationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -153,7 +154,48 @@ class ReportController extends Controller
             $labOrder->branch_id
         );
 
+        CommunicationService::notifyReportReleased($report, $user->id);
+
         return $this->show($request, $report);
+    }
+
+    public function notifyPatient(Request $request, LabReport $labReport): JsonResponse
+    {
+        $this->authorizeBranchRecord($request, $labReport->branch_id);
+
+        $validated = $request->validate([
+            'channels' => ['required', 'array', 'min:1'],
+            'channels.*' => ['in:sms,email'],
+            'email' => ['nullable', 'email', 'max:160'],
+            'phone' => ['nullable', 'string', 'max:40'],
+        ]);
+
+        $logs = CommunicationService::notifyReportReleased(
+            $labReport,
+            $request->user()?->id,
+            $validated['channels'],
+            $validated['email'] ?? null,
+            $validated['phone'] ?? null
+        );
+
+        AuditService::log(
+            $request,
+            'report.notified_patient',
+            'Reports',
+            "Dispatched report {$labReport->report_number} notification via " . strtoupper(implode(' & ', $validated['channels'])) . " to {$labReport->patient?->full_name}.",
+            'LabReport',
+            $labReport->id,
+            $labReport->report_number,
+            ['channels' => $validated['channels']],
+            $labReport->branch_id
+        );
+
+        return response()->json([
+            'message' => count($logs) > 0
+                ? 'Report notification dispatched (' . collect($logs)->map(fn ($l) => strtoupper($l->channel) . ': ' . $l->status)->implode(', ') . ').'
+                : 'No recipient contact details found for the selected channel(s).',
+            'logs' => $logs,
+        ]);
     }
 }
 

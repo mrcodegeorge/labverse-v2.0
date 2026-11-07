@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\LabOrder;
 use App\Models\Payment;
 use App\Services\AuditService;
+use App\Services\CommunicationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -149,12 +150,41 @@ class PaymentController extends Controller
 
             $payment->load(['patient', 'order.items.test', 'branch', 'receivedByUser:id,name,staff_id']);
 
+            CommunicationService::notifyPaymentReceipt($payment, $user->id);
+
             return response()->json([
                 'message' => 'Payment recorded and receipt generated successfully.',
                 'payment' => $payment,
                 'order' => $order,
             ], 201);
         });
+    }
+
+    public function notifyReceipt(Request $request, Payment $payment): JsonResponse
+    {
+        $this->authorizeBranchRecord($request, $payment->branch_id);
+
+        $validated = $request->validate([
+            'channels' => ['required', 'array', 'min:1'],
+            'channels.*' => ['in:sms,email'],
+            'email' => ['nullable', 'email', 'max:160'],
+            'phone' => ['nullable', 'string', 'max:40'],
+        ]);
+
+        $logs = CommunicationService::notifyPaymentReceipt(
+            $payment,
+            $request->user()?->id,
+            $validated['channels'],
+            $validated['email'] ?? null,
+            $validated['phone'] ?? null
+        );
+
+        return response()->json([
+            'message' => count($logs) > 0
+                ? 'Payment receipt dispatched (' . collect($logs)->map(fn ($l) => strtoupper($l->channel) . ': ' . $l->status)->implode(', ') . ').'
+                : 'No recipient contact details found for the selected channel(s).',
+            'logs' => $logs,
+        ]);
     }
 
     public function showReceipt(Request $request, Payment $payment): JsonResponse

@@ -11,6 +11,7 @@ use App\Models\Patient;
 use App\Models\Payment;
 use App\Models\Sample;
 use App\Services\AuditService;
+use App\Services\CommunicationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -221,6 +222,8 @@ class LabOrderController extends Controller
                 'samples',
                 'payments',
             ]);
+
+            CommunicationService::notifyOrderPlaced($order, $user->id);
 
             return response()->json([
                 'message' => 'Laboratory test order placed successfully.',

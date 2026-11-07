@@ -87,6 +87,8 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:view_reports|release_report|approve_result');
     Route::post('/orders/{labOrder}/report', [ReportController::class, 'generateFromOrder'])
         ->middleware('permission:release_report|approve_result');
+    Route::post('/reports/{labReport}/notify', [ReportController::class, 'notifyPatient'])
+        ->middleware('permission:view_reports|release_report|approve_result');
 
     // Financial & Payment Management
     Route::get('/payments', [PaymentController::class, 'index'])
@@ -94,6 +96,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/payments', [PaymentController::class, 'store'])
         ->middleware('permission:manage_payments');
     Route::get('/payments/{payment}', [PaymentController::class, 'showReceipt'])
+        ->middleware('permission:view_payments|manage_payments');
+    Route::post('/payments/{payment}/notify', [PaymentController::class, 'notifyReceipt'])
         ->middleware('permission:view_payments|manage_payments');
 
     // Inventory & Stock Management
@@ -123,10 +127,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/roles/{role}/permissions', [AdminController::class, 'updateRolePermissions'])
         ->middleware('permission:manage_roles|manage_users');
 
-    // Audit Logs & System Settings
+    // Audit Logs, System Settings & SMTP/SMS Communications
     Route::get('/audit-logs', [AdminController::class, 'auditLogs'])
         ->middleware('permission:manage_users|manage_settings');
     Route::get('/settings', [AdminController::class, 'settings']);
     Route::put('/settings', [AdminController::class, 'updateSettings'])
         ->middleware('permission:manage_settings');
+
+    Route::get('/communications/logs', [AdminController::class, 'communicationLogs'])
+        ->middleware('permission:manage_settings|manage_users|view_reports');
+    Route::post('/communications/test-email', [AdminController::class, 'sendTestEmail'])
+        ->middleware('permission:manage_settings');
+    Route::post('/communications/test-sms', [AdminController::class, 'sendTestSms'])
+        ->middleware('permission:manage_settings');
+    Route::post('/communications/logs/{communicationLog}/retry', [AdminController::class, 'retryCommunication'])
+        ->middleware('permission:manage_settings|view_reports');
 });

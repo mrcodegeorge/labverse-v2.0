@@ -928,9 +928,14 @@ window.LabverseLabOps = (function () {
                                     <td>${UI.formatDateTime(r.released_at)}</td>
                                     <td><span class="font-mono small lv-badge lv-badge-teal">${UI.esc(r.verification_code)}</span></td>
                                     <td class="text-end">
-                                        <button type="button" class="btn btn-primary btn-sm" onclick="LabverseLabOps.openReportPreview(${r.id})">
-                                            <i data-lucide="printer" style="width:14px;height:14px;"></i> Preview / Print PDF
-                                        </button>
+                                        <div class="d-inline-flex gap-1">
+                                            <button type="button" class="btn btn-light-surface btn-sm" title="Send Report via SMS or Email" onclick="LabverseLabOps.openSendReportNotificationModal(${r.id}, '${UI.esc(r.report_number)}', '${UI.esc(r.patient?.full_name || '')}', '${UI.esc(r.patient?.phone || '')}', '${UI.esc(r.patient?.email || '')}')">
+                                                <i data-lucide="send" style="width:14px;height:14px;"></i> SMS / Email
+                                            </button>
+                                            <button type="button" class="btn btn-primary btn-sm" onclick="LabverseLabOps.openReportPreview(${r.id})">
+                                                <i data-lucide="printer" style="width:14px;height:14px;"></i> Preview / Print PDF
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -968,6 +973,9 @@ window.LabverseLabOps = (function () {
                         <h5 class="mb-0 fw-bold">Official Medical Laboratory Report</h5>
                     </div>
                     <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="LabverseLabOps.openSendReportNotificationModal(${r.id}, '${UI.esc(r.report_number)}', '${UI.esc(p.full_name || '')}', '${UI.esc(p.phone || '')}', '${UI.esc(p.email || '')}')">
+                            <i data-lucide="send" style="width:15px;height:15px;"></i> Send via SMS / Email
+                        </button>
                         <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">
                             <i data-lucide="printer" style="width:15px;height:15px;"></i> Print / Save as PDF
                         </button>
@@ -1098,6 +1106,77 @@ window.LabverseLabOps = (function () {
         }
     }
 
+    function openSendReportNotificationModal(reportId, reportNumber, patientName, phone, email) {
+        const html = `
+            <form onsubmit="event.preventDefault(); LabverseLabOps.submitSendReportNotification(${reportId});">
+                <div class="p-3 border-bottom bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold"><i data-lucide="send" style="width:18px;height:18px;color:var(--lv-primary);"></i> Dispatch Report Notification — ${UI.esc(reportNumber)}</h5>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="LabverseApp.closeDialog()"></button>
+                </div>
+                <div class="p-4">
+                    <div class="p-3 rounded bg-light border small mb-3">
+                        <strong>Patient:</strong> ${UI.esc(patientName)}<br>
+                        <span class="text-secondary">Dispatch official report readiness alert via SMS Gateway and/or SMTP Email with verification code.</span>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Select Delivery Channel(s)</label>
+                        <div class="d-flex gap-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="rep-notify-sms" checked>
+                                <label class="form-check-label fw-medium" for="rep-notify-sms">SMS Notification</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="rep-notify-email" ${email ? 'checked' : ''}>
+                                <label class="form-check-label fw-medium" for="rep-notify-email">SMTP Email Summary</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="rep-notify-phone-val" class="form-label">Recipient Mobile Phone (SMS)</label>
+                        <input type="tel" id="rep-notify-phone-val" class="form-control font-mono" value="${UI.esc(phone)}" placeholder="+233 24 000 0000">
+                    </div>
+                    <div class="mb-2">
+                        <label for="rep-notify-email-val" class="form-label">Recipient Email Address (SMTP)</label>
+                        <input type="email" id="rep-notify-email-val" class="form-control" value="${UI.esc(email)}" placeholder="patient@example.com">
+                    </div>
+                </div>
+                <div class="p-3 border-top bg-light d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-light-surface" onclick="LabverseApp.closeDialog()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i data-lucide="send" style="width:15px;height:15px;"></i> Dispatch Notification Now
+                    </button>
+                </div>
+            </form>
+        `;
+        window.LabverseApp.openDialog(html);
+        UI.refreshIcons();
+    }
+
+    async function submitSendReportNotification(reportId) {
+        const channels = [];
+        if (document.getElementById('rep-notify-sms')?.checked) channels.push('sms');
+        if (document.getElementById('rep-notify-email')?.checked) channels.push('email');
+
+        if (channels.length === 0) {
+            UI.toast('Please select at least one channel (SMS or Email).', 'warning');
+            return;
+        }
+
+        const phone = document.getElementById('rep-notify-phone-val')?.value?.trim() || null;
+        const email = document.getElementById('rep-notify-email-val')?.value?.trim() || null;
+
+        try {
+            const res = await UI.api(`/reports/${reportId}/notify`, {
+                method: 'POST',
+                body: { channels, phone, email },
+            });
+            UI.toast(res.message, 'success');
+            window.LabverseApp.closeDialog();
+        } catch (err) {
+            UI.toast(err.message, 'error');
+        }
+    }
+
     return {
         renderLaboratoryWorkspace,
         applyLabFilters,
@@ -1115,6 +1194,8 @@ window.LabverseLabOps = (function () {
         renderReportsModule,
         filterReports,
         openReportPreview,
+        openSendReportNotificationModal,
+        submitSendReportNotification,
     };
 })();
 

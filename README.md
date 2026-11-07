@@ -56,6 +56,15 @@ Built on **Laravel 13**, **Sanctum REST API**, and a responsive **Bootstrap 5 / 
     - Multi-branch isolation for branch-bound staff while granting Platform Administrators cross-branch visibility and switching.
     - Custom Role-Based Access Control (`roles`, `permissions`, `role_user`, `permission_role`) with granular middleware enforcement (`CheckPermission`) and immutable audit logging (`AuditService`).
 
+11. **SMTP Email & Multi-Provider SMS Gateway Integration**
+    - Runtime-configurable **SMTP Email** (`smtp` or `sandbox/log`) with branded HTML clinical emails.
+    - Multi-provider **SMS Gateway** integration supporting **Arkesel**, **mNotify**, **Hubtel**, **Termii**, **Twilio**, **Custom HTTP Webhooks**, and **Sandbox Simulator**.
+    - Automated clinical notifications (Patient Welcome, Order Placed, Report Released, Critical/Panic Value Alert, Payment Receipt) with customizable message templates, 1-click manual report/receipt dispatch, live test tools, and a searchable **Communication Outbox** (`communication_logs`).
+
+12. **No-Code Visual Server Installer (`/install`) for Non-Developers**
+    - Built-in 4-step browser Setup Wizard (`/install`) that checks PHP requirements & folder permissions, configures **1-Click Embedded SQLite** or **MySQL/MariaDB**, customizes laboratory branding & administrator credentials, and provisions either a **Clean Production Laboratory** or **Full Clinical Demo Dataset**.
+    - Includes 1-click Windows launcher (`start-windows.bat`), 1-command Ubuntu/Debian VPS installer (`install-server.sh`), cPanel `.htaccess` routing, and [`INSTALLATION_GUIDE.md`](INSTALLATION_GUIDE.md).
+
 ---
 
 ## Technology Stack
@@ -120,21 +129,18 @@ Open **http://127.0.0.1:8000** in your browser.
 
 ---
 
-## Pre-Seeded Demo Accounts (Password: `password`)
+## Pre-Seeded Demo Accounts (Password: `password123`)
 
 The login screen includes a **1-Click Role Switcher** for testing different clinical personas and RBAC permissions:
 
-| Role | Email | Password | Primary Responsibilities |
-| :--- | :--- | :--- | :--- |
-| **Platform Administrator** | `admin@labverse.health` | `password` | Full cross-branch access, system settings, RBAC, branch & staff management |
-| **Facility Administrator** | `facility@labverse.health` | `password` | Branch administration, staff oversight, inventory, and operational reporting |
-| **Laboratory Manager** | `manager@labverse.health` | `password` | Lab operations, TAT monitoring, result verification, report release, catalogue |
-| **Laboratory Supervisor** | `supervisor@labverse.health` | `password` | Result approval/rejection, clinical review, report sign-off |
-| **Medical Lab Scientist** | `scientist@labverse.health` | `password` | Bench testing, result entry, sample processing, repeat testing |
-| **Laboratory Technician** | `technician@labverse.health` | `password` | Sample processing, bench assistance, draft result entry |
-| **Phlebotomist** | `phlebotomist@labverse.health` | `password` | Venipuncture, barcode label printing, sample reception & rejection |
-| **Receptionist** | `reception@labverse.health` | `password` | Patient registration, test order creation, report printing |
-| **Cashier** | `cashier@labverse.health` | `password` | Invoice collection, payment recording, refunds, receipt printing |
+| Role | Staff Name | Email | Password | Primary Responsibilities |
+| :--- | :--- | :--- | :--- | :--- |
+| **Platform Administrator** | Dr. Kwame Mensah-Bonsu | `admin@labverse.com` | `password123` | Full cross-branch access, system settings, RBAC, branch & staff management |
+| **Laboratory Supervisor** | Dr. Efua Djan-Baffour | `supervisor@labverse.com` | `password123` | Result approval/rejection, clinical review, report sign-off |
+| **Medical Lab Scientist** | Nana Yaw Asante | `scientist@labverse.com` | `password123` | Bench testing, result entry, sample processing, repeat testing |
+| **Front Desk Receptionist** | Akosua Serwaa Boateng | `reception@labverse.com` | `password123` | Patient registration, test order creation, report printing |
+| **Cashier / Billing Officer** | Emmanuel Tetteh Quarshie | `cashier@labverse.com` | `password123` | Invoice collection, payment recording, refunds, receipt printing |
+| **Branch Lab Manager (Kumasi)** | Dr. Abena Osei-Tutu | `kumasi.manager@labverse.com` | `password123` | Branch operations, TAT monitoring, result verification, catalogue |
 
 ---
 
