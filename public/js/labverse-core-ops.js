@@ -1718,9 +1718,14 @@ window.LabverseCoreOps = (function () {
                                         <td class="font-mono fw-bold text-success">${UI.formatCurrency(p.amount)}</td>
                                         <td class="small">${UI.esc(p.received_by_user?.name || 'Cashier')}</td>
                                         <td class="text-end">
-                                            <button type="button" class="btn btn-light-surface btn-sm" onclick="LabverseCoreOps.viewReceipt(${p.id})">
-                                                <i data-lucide="printer" style="width:14px;height:14px;"></i> Receipt
-                                            </button>
+                                            <div class="d-inline-flex gap-1">
+                                                <button type="button" class="btn btn-light-surface btn-sm" title="Send Receipt via SMS or Email" onclick="LabverseCoreOps.sendPaymentReceiptAlert(${p.id})">
+                                                    <i data-lucide="send" style="width:14px;height:14px;"></i> SMS/Email
+                                                </button>
+                                                <button type="button" class="btn btn-light-surface btn-sm" onclick="LabverseCoreOps.viewReceipt(${p.id})">
+                                                    <i data-lucide="printer" style="width:14px;height:14px;"></i> Receipt
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -1893,15 +1898,32 @@ window.LabverseCoreOps = (function () {
                 </div>
                 <div class="lv-drawer-footer lv-no-print">
                     <button type="button" class="btn btn-light-surface" onclick="LabverseApp.closeDrawer()">Close</button>
-                    <button type="button" class="btn btn-primary" onclick="window.print()">
-                        <i data-lucide="printer" style="width:15px;height:15px;"></i> Print Receipt
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-primary" onclick="LabverseCoreOps.sendPaymentReceiptAlert(${p.id})">
+                            <i data-lucide="send" style="width:15px;height:15px;"></i> Send via SMS / Email
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="window.print()">
+                            <i data-lucide="printer" style="width:15px;height:15px;"></i> Print Receipt
+                        </button>
+                    </div>
                 </div>
             `;
             window.LabverseApp.openDrawer(html);
         } catch (err) {
             UI.toast(err.message, 'error');
             window.LabverseApp.closeDrawer();
+        }
+    }
+
+    async function sendPaymentReceiptAlert(paymentId) {
+        try {
+            const res = await UI.api(`/payments/${paymentId}/notify`, {
+                method: 'POST',
+                body: { channels: ['sms', 'email'] },
+            });
+            UI.toast(res.message, 'success');
+        } catch (err) {
+            UI.toast(err.message, 'error');
         }
     }
 
@@ -1943,6 +1965,7 @@ window.LabverseCoreOps = (function () {
         openRecordPaymentModal,
         submitPayment,
         viewReceipt,
+        sendPaymentReceiptAlert,
     };
 })();
 

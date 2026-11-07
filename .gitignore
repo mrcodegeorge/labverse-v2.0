@@ -29,3 +29,4 @@ Thumbs.db
 /database/*.sqlite-journal
 /database/*.sqlite-shm
 /database/*.sqlite-wal
+/*.zip
