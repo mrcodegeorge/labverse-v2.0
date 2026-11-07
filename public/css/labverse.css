@@ -1,0 +1,830 @@
+/* ============================================================================
+ * LABVERSE — Enterprise Healthcare LIMS Design System (Phase 2)
+ * Primary: #164E8A | Secondary: #0F9D9A | Accent: #E6B85C
+ * Background: #F5F7FA | Surface: #FFFFFF | Text: #1E293B / #64748B | Border: #E2E8F0
+ * ============================================================================ */
+
+:root {
+    --lv-primary: #164E8A;
+    --lv-primary-hover: #103B6A;
+    --lv-primary-soft: #E8F0F8;
+    --lv-secondary: #0F9D9A;
+    --lv-secondary-hover: #0B7B79;
+    --lv-secondary-soft: #E6F6F5;
+    --lv-accent: #E6B85C;
+    --lv-accent-soft: #FDF6E7;
+
+    --lv-bg: #F5F7FA;
+    --lv-surface: #FFFFFF;
+    --lv-surface-subtle: #F8FAFC;
+    --lv-text-primary: #1E293B;
+    --lv-text-secondary: #64748B;
+    --lv-text-muted: #94A3B8;
+    --lv-border: #E2E8F0;
+    --lv-border-strong: #CBD5E1;
+
+    /* Clinical Status Palette (WCAG 2.2 AA Contrast) */
+    --lv-success: #15803D;
+    --lv-success-bg: #DCFCE7;
+    --lv-success-border: #86EFAC;
+
+    --lv-warning: #B45309;
+    --lv-warning-bg: #FEF3C7;
+    --lv-warning-border: #FCD34D;
+
+    --lv-danger: #B91C1C;
+    --lv-danger-bg: #FEE2E2;
+    --lv-danger-border: #FCA5A5;
+
+    --lv-critical: #991B1B;
+    --lv-critical-bg: #FEF2F2;
+    --lv-critical-border: #EF4444;
+
+    --lv-info: #1D4ED8;
+    --lv-info-bg: #DBEAFE;
+    --lv-info-border: #93C5FD;
+
+    --lv-neutral: #475569;
+    --lv-neutral-bg: #F1F5F9;
+    --lv-neutral-border: #CBD5E1;
+
+    --lv-sidebar-width: 264px;
+    --lv-sidebar-collapsed-width: 72px;
+    --lv-topbar-height: 64px;
+    --lv-radius: 6px;
+    --lv-radius-lg: 8px;
+    --lv-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+    --lv-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+    --lv-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+/* Base Reset & Typography */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+    background-color: var(--lv-bg);
+    color: var(--lv-text-primary);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+.font-mono {
+    font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.875rem;
+    letter-spacing: -0.01em;
+}
+
+/* WCAG 2.2 AA Accessible Keyboard Focus Ring & Reduced Motion */
+:focus-visible {
+    outline: 2px solid var(--lv-primary) !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 4px rgba(22, 78, 138, 0.15) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Native <dialog> Enterprise Styling */
+dialog.lv-dialog {
+    border: 1px solid var(--lv-border);
+    border-radius: var(--lv-radius-lg);
+    padding: 0;
+    max-width: 720px;
+    width: calc(100% - 2rem);
+    box-shadow: var(--lv-shadow-md);
+    color: var(--lv-text-primary);
+    background-color: var(--lv-surface);
+}
+
+dialog.lv-dialog.lv-dialog-lg {
+    max-width: 960px;
+}
+
+dialog.lv-dialog::backdrop {
+    background-color: rgba(15, 23, 42, 0.48);
+}
+
+/* Bootstrap 5 Enterprise Overrides */
+.btn {
+    font-weight: 500;
+    font-size: 0.875rem;
+    border-radius: var(--lv-radius);
+    padding: 0.45rem 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    min-height: 36px;
+}
+
+.btn-sm {
+    padding: 0.28rem 0.65rem;
+    font-size: 0.8125rem;
+    min-height: 30px;
+}
+
+.btn-lg {
+    padding: 0.6rem 1.25rem;
+    font-size: 0.95rem;
+    min-height: 42px;
+}
+
+.btn-primary {
+    background-color: var(--lv-primary);
+    border-color: var(--lv-primary);
+    color: #FFFFFF;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background-color: var(--lv-primary-hover);
+    border-color: var(--lv-primary-hover);
+    color: #FFFFFF;
+}
+
+.btn-secondary-teal {
+    background-color: var(--lv-secondary);
+    border-color: var(--lv-secondary);
+    color: #FFFFFF;
+}
+
+.btn-secondary-teal:hover,
+.btn-secondary-teal:focus {
+    background-color: var(--lv-secondary-hover);
+    border-color: var(--lv-secondary-hover);
+    color: #FFFFFF;
+}
+
+.btn-outline-primary {
+    color: var(--lv-primary);
+    border-color: var(--lv-primary);
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--lv-primary);
+    border-color: var(--lv-primary);
+    color: #FFFFFF;
+}
+
+.btn-light-surface {
+    background-color: var(--lv-surface);
+    border: 1px solid var(--lv-border);
+    color: var(--lv-text-primary);
+}
+
+.btn-light-surface:hover {
+    background-color: var(--lv-surface-subtle);
+    border-color: var(--lv-border-strong);
+    color: var(--lv-text-primary);
+}
+
+/* Form Controls */
+.form-label {
+    font-weight: 500;
+    font-size: 0.8125rem;
+    color: var(--lv-text-primary);
+    margin-bottom: 0.35rem;
+}
+
+.form-control,
+.form-select {
+    font-size: 0.875rem;
+    border-color: var(--lv-border);
+    border-radius: var(--lv-radius);
+    color: var(--lv-text-primary);
+    padding: 0.45rem 0.75rem;
+    min-height: 38px;
+    background-color: var(--lv-surface);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--lv-primary);
+    box-shadow: 0 0 0 3px rgba(22, 78, 138, 0.12);
+}
+
+.form-control::placeholder {
+    color: var(--lv-text-muted);
+}
+
+/* ============================================================================
+ * GLOBAL APPLICATION SHELL (Phase 3)
+ * ============================================================================ */
+.lv-shell {
+    display: flex;
+    min-height: 100vh;
+    width: 100%;
+    background-color: var(--lv-bg);
+}
+
+/* Left Sidebar */
+.lv-sidebar {
+    width: var(--lv-sidebar-width);
+    background-color: #0F294A;
+    color: #E2E8F0;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1035;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    transition: width 0.2s ease, transform 0.2s ease;
+}
+
+.lv-shell.sidebar-collapsed .lv-sidebar {
+    width: var(--lv-sidebar-collapsed-width);
+}
+
+.lv-sidebar-brand {
+    height: var(--lv-topbar-height);
+    padding: 0 1.15rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: #0B213D;
+}
+
+.lv-brand-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    text-decoration: none;
+    color: #FFFFFF;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.lv-brand-mark {
+    width: 34px;
+    height: 34px;
+    border-radius: 6px;
+    background-color: var(--lv-secondary);
+    color: #FFFFFF;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-weight: 700;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.lv-brand-title {
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 0.04em;
+    color: #FFFFFF;
+    line-height: 1.1;
+}
+
+.lv-brand-subtitle {
+    font-size: 0.68rem;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    display: block;
+}
+
+.lv-shell.sidebar-collapsed .lv-brand-text,
+.lv-shell.sidebar-collapsed .lv-nav-section-label,
+.lv-shell.sidebar-collapsed .lv-nav-label,
+.lv-shell.sidebar-collapsed .lv-nav-badge,
+.lv-shell.sidebar-collapsed .lv-sidebar-footer-details {
+    display: none !important;
+}
+
+.lv-sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.75rem 0.65rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.lv-nav-section-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #94A3B8;
+    padding: 0.75rem 0.65rem 0.35rem;
+}
+
+.lv-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: var(--lv-radius);
+    color: #CBD5E1;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.85rem;
+    margin-bottom: 2px;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.lv-nav-item:hover {
+    background-color: rgba(255, 255, 255, 0.07);
+    color: #FFFFFF;
+}
+
+.lv-nav-item.active {
+    background-color: var(--lv-primary);
+    color: #FFFFFF;
+    font-weight: 600;
+    box-shadow: inset 3px 0 0 var(--lv-accent);
+}
+
+.lv-nav-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    opacity: 0.9;
+}
+
+.lv-nav-badge {
+    margin-left: auto;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.14);
+    color: #FFFFFF;
+}
+
+.lv-nav-badge.badge-critical {
+    background-color: #DC2626;
+    color: #FFFFFF;
+}
+
+.lv-sidebar-footer {
+    padding: 0.75rem 0.85rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: #0B213D;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+/* Main Content Wrapper */
+.lv-main-wrapper {
+    flex: 1;
+    margin-left: var(--lv-sidebar-width);
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    transition: margin-left 0.2s ease;
+}
+
+.lv-shell.sidebar-collapsed .lv-main-wrapper {
+    margin-left: var(--lv-sidebar-collapsed-width);
+}
+
+/* Top Navigation Header */
+.lv-topbar {
+    height: var(--lv-topbar-height);
+    background-color: var(--lv-surface);
+    border-bottom: 1px solid var(--lv-border);
+    padding: 0 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 1025;
+}
+
+.lv-global-search-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+}
+
+.lv-global-search-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: var(--lv-surface);
+    border: 1px solid var(--lv-border);
+    border-radius: var(--lv-radius-lg);
+    box-shadow: var(--lv-shadow-md);
+    z-index: 1050;
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+/* Main Workspace Content */
+.lv-workspace {
+    flex: 1;
+    padding: 1.5rem;
+    max-width: 1600px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+/* Page Header Component */
+.lv-page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--lv-border);
+}
+
+.lv-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    color: var(--lv-text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.lv-page-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--lv-text-primary);
+    margin: 0;
+    letter-spacing: -0.015em;
+}
+
+.lv-page-description {
+    font-size: 0.85rem;
+    color: var(--lv-text-secondary);
+    margin: 0.2rem 0 0;
+}
+
+/* Reusable Enterprise Cards & Panels */
+.lv-card {
+    background-color: var(--lv-surface);
+    border: 1px solid var(--lv-border);
+    border-radius: var(--lv-radius-lg);
+    box-shadow: var(--lv-shadow-xs);
+}
+
+.lv-card-header {
+    padding: 0.9rem 1.2rem;
+    border-bottom: 1px solid var(--lv-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    background-color: var(--lv-surface);
+    border-top-left-radius: var(--lv-radius-lg);
+    border-top-right-radius: var(--lv-radius-lg);
+}
+
+.lv-card-title {
+    font-size: 0.925rem;
+    font-weight: 600;
+    color: var(--lv-text-primary);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.lv-card-body {
+    padding: 1.2rem;
+}
+
+/* KPI Statistics Card */
+.lv-stat-card {
+    background-color: var(--lv-surface);
+    border: 1px solid var(--lv-border);
+    border-radius: var(--lv-radius-lg);
+    padding: 1rem 1.15rem;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    box-shadow: var(--lv-shadow-xs);
+    height: 100%;
+}
+
+.lv-stat-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--lv-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 0.35rem;
+}
+
+.lv-stat-value {
+    font-size: 1.55rem;
+    font-weight: 700;
+    color: var(--lv-text-primary);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+}
+
+.lv-stat-meta {
+    font-size: 0.76rem;
+    color: var(--lv-text-secondary);
+    margin-top: 0.35rem;
+}
+
+.lv-stat-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--lv-radius);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Enterprise Data Tables */
+.lv-table-container {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.lv-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 0;
+}
+
+.lv-table thead th {
+    background-color: var(--lv-surface-subtle);
+    color: var(--lv-text-secondary);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--lv-border);
+    white-space: nowrap;
+}
+
+.lv-table tbody td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--lv-border);
+    vertical-align: middle;
+    color: var(--lv-text-primary);
+    font-size: 0.85rem;
+}
+
+.lv-table tbody tr:hover {
+    background-color: #F8FAFC;
+}
+
+.lv-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Semantic Status Badges */
+.lv-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.74rem;
+    font-weight: 600;
+    border-radius: 4px;
+    line-height: 1.2;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.lv-badge-success {
+    background-color: var(--lv-success-bg);
+    color: var(--lv-success);
+    border-color: var(--lv-success-border);
+}
+
+.lv-badge-warning {
+    background-color: var(--lv-warning-bg);
+    color: var(--lv-warning);
+    border-color: var(--lv-warning-border);
+}
+
+.lv-badge-danger {
+    background-color: var(--lv-danger-bg);
+    color: var(--lv-danger);
+    border-color: var(--lv-danger-border);
+}
+
+.lv-badge-critical {
+    background-color: var(--lv-critical);
+    color: #FFFFFF;
+    border-color: var(--lv-critical);
+    font-weight: 700;
+}
+
+.lv-badge-info {
+    background-color: var(--lv-info-bg);
+    color: var(--lv-info);
+    border-color: var(--lv-info-border);
+}
+
+.lv-badge-teal {
+    background-color: var(--lv-secondary-soft);
+    color: var(--lv-secondary-hover);
+    border-color: #99DFDD;
+}
+
+.lv-badge-neutral {
+    background-color: var(--lv-neutral-bg);
+    color: var(--lv-neutral);
+    border-color: var(--lv-neutral-border);
+}
+
+/* Filter Bar */
+.lv-filter-bar {
+    background-color: var(--lv-surface);
+    border: 1px solid var(--lv-border);
+    border-radius: var(--lv-radius-lg);
+    padding: 0.85rem 1rem;
+    margin-bottom: 1rem;
+}
+
+/* Slide-Over Drawer / Contextual Inspector */
+.lv-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(15, 23, 42, 0.45);
+    z-index: 1055;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.lv-drawer {
+    width: 100%;
+    max-width: 780px;
+    background-color: var(--lv-surface);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: -8px 0 24px rgba(15, 23, 42, 0.16);
+}
+
+.lv-drawer.lv-drawer-xl {
+    max-width: 980px;
+}
+
+.lv-drawer-header {
+    padding: 1rem 1.35rem;
+    border-bottom: 1px solid var(--lv-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: var(--lv-surface-subtle);
+}
+
+.lv-drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.35rem;
+}
+
+.lv-drawer-footer {
+    padding: 0.9rem 1.35rem;
+    border-top: 1px solid var(--lv-border);
+    background-color: var(--lv-surface-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+/* Clinical Report Document Sheet */
+.lv-report-sheet {
+    background-color: #FFFFFF;
+    border: 1px solid var(--lv-border);
+    border-radius: var(--lv-radius);
+    padding: 2.25rem;
+    color: #0F172A;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.lv-report-header {
+    border-bottom: 2px solid var(--lv-primary);
+    padding-bottom: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.lv-barcode-box {
+    font-family: 'Libre Barcode 39', 'JetBrains Mono', monospace;
+    letter-spacing: 0.12em;
+    background: #F8FAFC;
+    border: 1px dashed #CBD5E1;
+    padding: 0.45rem 0.75rem;
+    border-radius: 4px;
+    text-align: center;
+}
+
+/* Responsive Breakpoints (Desktop / Tablet / Mobile) */
+@media (max-width: 991.98px) {
+    .lv-sidebar {
+        transform: translateX(-100%);
+        width: var(--lv-sidebar-width) !important;
+    }
+
+    .lv-shell.mobile-nav-open .lv-sidebar {
+        transform: translateX(0);
+    }
+
+    .lv-main-wrapper,
+    .lv-shell.sidebar-collapsed .lv-main-wrapper {
+        margin-left: 0 !important;
+    }
+
+    .lv-workspace {
+        padding: 1rem;
+    }
+
+    .lv-topbar {
+        padding: 0 1rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .lv-page-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .lv-report-sheet {
+        padding: 1rem;
+    }
+}
+
+/* Professional Medical Print Styling */
+@media print {
+    body {
+        background: #FFFFFF !important;
+        color: #000000 !important;
+        font-size: 12px !important;
+    }
+
+    .lv-sidebar,
+    .lv-topbar,
+    .lv-page-header,
+    .lv-filter-bar,
+    .lv-no-print,
+    .lv-drawer-header,
+    .lv-drawer-footer {
+        display: none !important;
+    }
+
+    .lv-main-wrapper {
+        margin-left: 0 !important;
+    }
+
+    .lv-workspace,
+    .lv-drawer-backdrop,
+    .lv-drawer,
+    .lv-drawer-body {
+        position: static !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        background: #FFFFFF !important;
+    }
+
+    .lv-report-sheet {
+        border: none !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+        box-shadow: none !important;
+    }
+}
